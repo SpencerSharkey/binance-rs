@@ -26,7 +26,8 @@ pub struct Account {
 
 struct OrderRequest {
     pub symbol: String,
-    pub qty: f64,
+    pub qty: Option<f64>,
+    pub quote_order_qty: Option<f64>,
     pub price: f64,
     pub order_side: String,
     pub order_type: String,
@@ -146,7 +147,8 @@ impl Account {
     {
         let buy: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price,
             order_side: ORDER_SIDE_BUY.to_string(),
             order_type: ORDER_TYPE_LIMIT.to_string(),
@@ -170,7 +172,8 @@ impl Account {
     {
         let buy: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price,
             order_side: ORDER_SIDE_BUY.to_string(),
             order_type: ORDER_TYPE_LIMIT.to_string(),
@@ -192,7 +195,8 @@ impl Account {
     {
         let sell: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price,
             order_side: ORDER_SIDE_SELL.to_string(),
             order_type: ORDER_TYPE_LIMIT.to_string(),
@@ -216,7 +220,8 @@ impl Account {
     {
         let sell: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price,
             order_side: ORDER_SIDE_SELL.to_string(),
             order_type: ORDER_TYPE_LIMIT.to_string(),
@@ -238,7 +243,8 @@ impl Account {
     {
         let buy: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price: 0.0,
             order_side: ORDER_SIDE_BUY.to_string(),
             order_type: ORDER_TYPE_MARKET.to_string(),
@@ -262,7 +268,56 @@ impl Account {
     {
         let buy: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
+            price: 0.0,
+            order_side: ORDER_SIDE_BUY.to_string(),
+            order_type: ORDER_TYPE_MARKET.to_string(),
+            time_in_force: TIME_IN_FORCE_GTC.to_string(),
+        };
+        let order = self.build_order(buy);
+        let request = build_signed_request(order, self.recv_window)?;
+        let data = self.client.post_signed(API_V3_ORDER_TEST, &request)?;
+        let _: TestResponse = from_str(data.as_str())?;
+
+        Ok(())
+    }
+
+    // Place a MARKET order (using quote_order_qty) - BUY
+    pub fn market_buy_quote<S, F>(&self, symbol: S, quote_order_qty: F) -> Result<Transaction>
+    where
+        S: Into<String>,
+        F: Into<f64>,
+    {
+        let buy: OrderRequest = OrderRequest {
+            symbol: symbol.into(),
+            qty: None,
+            quote_order_qty: Some(quote_order_qty.into()),
+            price: 0.0,
+            order_side: ORDER_SIDE_BUY.to_string(),
+            order_type: ORDER_TYPE_MARKET.to_string(),
+            time_in_force: TIME_IN_FORCE_GTC.to_string(),
+        };
+        let order = self.build_order(buy);
+        let request = build_signed_request(order, self.recv_window)?;
+        let data = self.client.post_signed(API_V3_ORDER, &request)?;
+        let transaction: Transaction = from_str(data.as_str())?;
+
+        Ok(transaction)
+    }
+
+    /// Place a test MARKET order (using quote_order_qty) - BUY
+    ///
+    /// This order is sandboxed: it is validated, but not sent to the matching engine.
+    pub fn test_market_buy_quote<S, F>(&self, symbol: S, quote_order_qty: F) -> Result<()>
+    where
+        S: Into<String>,
+        F: Into<f64>,
+    {
+        let buy: OrderRequest = OrderRequest {
+            symbol: symbol.into(),
+            qty: None,
+            quote_order_qty: Some(quote_order_qty.into()),
             price: 0.0,
             order_side: ORDER_SIDE_BUY.to_string(),
             order_type: ORDER_TYPE_MARKET.to_string(),
@@ -284,7 +339,8 @@ impl Account {
     {
         let sell: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price: 0.0,
             order_side: ORDER_SIDE_SELL.to_string(),
             order_type: ORDER_TYPE_MARKET.to_string(),
@@ -308,7 +364,8 @@ impl Account {
     {
         let sell: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price: 0.0,
             order_side: ORDER_SIDE_SELL.to_string(),
             order_type: ORDER_TYPE_MARKET.to_string(),
@@ -322,16 +379,9 @@ impl Account {
         Ok(())
     }
 
-
     /// Place a custom order
     pub fn custom_order<S, F>(
-        &self,
-        symbol: S,
-        qty: F,
-        price: f64,
-        order_side: S,
-        order_type: S,
-        execution_type: S,
+        &self, symbol: S, qty: F, price: f64, order_side: S, order_type: S, execution_type: S,
     ) -> Result<Transaction>
     where
         S: Into<String>,
@@ -339,7 +389,8 @@ impl Account {
     {
         let sell: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price,
             order_side: order_side.into(),
             order_type: order_type.into(),
@@ -353,18 +404,11 @@ impl Account {
         Ok(transaction)
     }
 
-
     /// Place a test custom order
     ///
     /// This order is sandboxed: it is validated, but not sent to the matching engine.
     pub fn test_custom_order<S, F>(
-        &self,
-        symbol: S,
-        qty: F,
-        price: f64,
-        order_side: S,
-        order_type: S,
-        execution_type: S,
+        &self, symbol: S, qty: F, price: f64, order_side: S, order_type: S, execution_type: S,
     ) -> Result<()>
     where
         S: Into<String>,
@@ -372,7 +416,8 @@ impl Account {
     {
         let sell: OrderRequest = OrderRequest {
             symbol: symbol.into(),
-            qty: qty.into(),
+            qty: Some(qty.into()),
+            quote_order_qty: None,
             price,
             order_side: order_side.into(),
             order_type: order_type.into(),
@@ -441,7 +486,14 @@ impl Account {
         order_parameters.insert("symbol".into(), order.symbol);
         order_parameters.insert("side".into(), order.order_side);
         order_parameters.insert("type".into(), order.order_type);
-        order_parameters.insert("quantity".into(), order.qty.to_string());
+
+        if let Some(qty) = order.qty {
+            order_parameters.insert("quantity".into(), qty.to_string());
+        }
+
+        if let Some(quote_order_qty) = order.qty {
+            order_parameters.insert("quoteOrderQty".into(), quote_order_qty.to_string());
+        }
 
         if order.price != 0.0 {
             order_parameters.insert("price".into(), order.price.to_string());
