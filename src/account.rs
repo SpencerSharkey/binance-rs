@@ -491,7 +491,7 @@ impl Account {
             order_parameters.insert("quantity".into(), qty.to_string());
         }
 
-        if let Some(quote_order_qty) = order.qty {
+        if let Some(quote_order_qty) = order.quote_order_qty {
             order_parameters.insert("quoteOrderQty".into(), quote_order_qty.to_string());
         }
 
